@@ -1,21 +1,61 @@
 // use prisma-8
 
 model User {
-  id        Int      @id @default(autoincrement())
-  email     String   @unique
-  username  String?
+  id        String    @id @default(cuid(2))
+  clerkId   String    @unique
+  email     String?   @unique
+  firstName String?
+  lastName  String?
   name      String?
-  posts     Post[]
-  createdAt TimestamptzString @default(now())
-  updatedAt temporal.updatedAtString()
+  imageUrl  String?
+  createdAt DateTime  @default(now())
+  updatedAt temporal.updatedAt() 
+  projects  Project[]
+
+  @@map("users")
 }
 
-model Post {
-  id        Int      @id @default(autoincrement())
-  title     String
-  content   String?
-  author    User     @relation(fields: [authorId], references: [id])
-  authorId  Int
-  createdAt TimestamptzString @default(now())
-  updatedAt temporal.updatedAtString()
+model Project {
+  id        String    @id @default(uuid())
+  name      String
+  userId    String
+  user      User      @relation(fields: [userId], references: [id])
+  createdAt DateTime  @default(now())
+  updatedAt temporal.updatedAt() 
+  messages  Message[]
+}
+
+enum MessageRole {
+  @@type("pg/text@1")
+  USER = "USER"
+  ASSISTANT = "ASSISTANT"
+}
+
+enum MessageType {
+  @@type("pg/text@1")
+  RESULT = "RESULT"
+  ERROR = "ERROR"
+}
+
+model Message {
+  id        String      @id @default(cuid(2))
+  content   String
+  role      MessageRole
+  type      MessageType
+  createdAt DateTime    @default(now())
+  updatedAt temporal.updatedAt() 
+  projectId String
+  project   Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  fragment  Fragment?
+}
+
+model Fragment {
+  id         String   @id @default(cuid(2))
+  messageId  String   @unique
+  message    Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  sandboxUrl String
+  title      String
+  files      Json
+  createdAt  DateTime @default(now())
+  updatedAt  temporal.updatedAt() 
 }
