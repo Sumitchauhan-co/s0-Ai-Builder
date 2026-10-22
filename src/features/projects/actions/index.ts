@@ -4,9 +4,7 @@ import { getCurrentUser } from '@/features/auth/actions';
 import { inngest } from '@/features/inngest/client';
 import { generateSlug } from 'random-word-slugs';
 import { db } from '@/prisma/db';
-
-type MessageRole = 'USER' | 'ASSISTANT';
-type MessageType = 'RESULT' | 'ERROR';
+import { MessageRole, MessageType } from '../types';
 
 export const createProject = async (value: string) => {
 	const user = await getCurrentUser();
@@ -31,8 +29,17 @@ export const createProject = async (value: string) => {
 			return newProject;
 		});
 
-		// TODO: Send the project to inngest
-		return project;
+		await inngest.send({
+			name: 'code-agent/run',
+			data: { value, projectId: project.id },
+		});
+
+		// Serialize Temporal.Instant fields
+		return {
+			...project,
+			createdAt: project.createdAt.toString(),
+			updatedAt: project.updatedAt.toString(),
+		};
 	} catch (error) {
 		console.error('❌ Error creating project: ', error);
 		return { error: 'Failed to create project' };
@@ -46,12 +53,16 @@ export const getProjects = async () => {
 	}
 
 	try {
-		// Prisma 8 PostgreSQL orderBy uses a callback returning .asc() or .desc()
 		const projects = await db.orm.public.Project.where({ userId: user.id })
 			.orderBy((p) => p.createdAt.desc())
 			.all();
 
-		return projects;
+		// Map over list and convert Temporal.Instant to strings
+		return projects.map((project) => ({
+			...project,
+			createdAt: project.createdAt.toString(),
+			updatedAt: project.updatedAt.toString(),
+		}));
 	} catch (error) {
 		console.error('❌ Error getting projects: ', error);
 		return { error: 'Failed to get projects' };
@@ -73,7 +84,17 @@ export const getProjectById = async (id: string) => {
 			return { error: 'Project not found' };
 		}
 
-		return project;
+		// Serialize project and its nested messages array
+		return {
+			...project,
+			createdAt: project.createdAt.toString(),
+			updatedAt: project.updatedAt.toString(),
+			messages: project.messages?.map((msg: any) => ({
+				...msg,
+				createdAt: msg.createdAt.toString(),
+				updatedAt: msg.updatedAt.toString(),
+			})),
+		};
 	} catch (error) {
 		console.error('❌ Error getting project by id: ', error);
 		return { error: 'Failed to get project by id' };
